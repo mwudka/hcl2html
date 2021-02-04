@@ -1,0 +1,36 @@
+#jsonEditor {
+    border:1px solid #ccc;
+    flex: 1;
+}
+
+#hclEditor {
+    border:1px solid #ccc;
+    flex: 1;
+}
+
+* {
+    margin: 0;
+}
+
+#output {
+    border: 1px solid black;
+    margin: 5px;
+    flex: 1;
+    font-size: 25px;
+}
+
+html {
+    height: 100%;
+}
+
+body {
+    display: flex;
+    height: 100%;
+}
+
+#left {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
