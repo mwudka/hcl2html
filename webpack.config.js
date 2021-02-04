@@ -37,7 +37,7 @@ module.exports = {
 		new MiniCssExtractPlugin(),
 		new CopyWebpackPlugin({
 			patterns: [
-				{from: 'public/hcl_wasm.wasm'}
+				{from: 'public/hcl_wasm.wasm', to: './public/hcl_wasm.wasm'}
 			]
 		})
 	]
