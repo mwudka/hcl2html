@@ -11,23 +11,29 @@ import (
 
 func main() {
 	log.Println("Starting hcl_wasm")
-	done := make(chan struct{})
 
+	// To call go functions from JS, they need to be assigned to global variables. A real application would
+	// probably create a single (versioned?) global proxy object, rather than polluting the global namespaces
 	js.Global().Set("parse_hcl", js.FuncOf(func(this js.Value, args []js.Value) interface{} {
 		ret := make(map[string]interface{})
 
+		// JS is loosey-goosey, so it's important to check arguments carefully. Panics in go are very annoying, because
+		// they cause the go app to exit and JS can no longer call into GO
 		if args == nil || len(args) < 3 {
 			ret["error"] = js.ValueOf("Not enough args")
 			log.Println("Not enough args")
 			return ret
 		}
 		hcl := args[0].String()
+
+		// STDOUT is very helpfully redirected to the console, which makes printf-debugging easy
 		log.Println("Parsing HCL", hcl)
 
 		rawContext := args[1]
-		contextKeys := js.Global().Get("Object").Call("keys", rawContext)
 
 		context := hcl2.EvalContext{Variables: map[string]cty.Value{}, Functions: map[string]function.Function{}}
+
+		// This exposes a length function to HCL that returns the length of the given string
 		context.Functions["length"] = function.New(&function.Spec{
 			Params: []function.Parameter{{Type: cty.List(cty.String)}},
 			VarParam: nil,
@@ -38,6 +44,8 @@ func main() {
 			},
 		})
 
+		// Go/JS communication is very rudimentary. This is the only way to get objects with arbitrary shapes.
+		contextKeys := js.Global().Get("Object").Call("keys", rawContext)
 		for i := 0; i < contextKeys.Length(); i++ {
 			key := contextKeys.Index(i).String()
 			rawValue := rawContext.Get(key)
@@ -63,8 +71,9 @@ func main() {
 
 		}
 
+		// Since the go side of things can call any JS functions it can reach, it's possible to manipulate the DOM
+		// from go code
 		container := args[2]
-
 		for container.Get("firstChild").Truthy() {
 			firstChild := container.Get("firstChild")
 			log.Println("Removing old element", firstChild)
@@ -76,15 +85,23 @@ func main() {
 
 		createElements(js.Global().Get("document"), container, parsedHCL.Body, &context)
 
+		// Panics are bad for the reason given above, and shipping non-primitives to JS is painful. Because of that,
+		// the best mechanism for surfacing errors to JS is strings + status flags. A real application would have
+		// a JS facade over the go code that handles surfacing errors in a pleasant way.
 		if diagnostics.HasErrors() {
 			ret["error"] = js.ValueOf(diagnostics.Error())
 		}
 
 		return ret
 	}))
+
+	// Listening to a channel is a convenient way to prevent the application from exiting. Without something like this,
+	// the go application exits immediately after being instantiated and there's no way to call the exposed methods
+	done := make(chan struct{})
 	<-done
 }
 
+// This function (and its mutually recursive friend below) handle turning the given HCL structure into DOM elements
 func createElements(document js.Value, container js.Value, body hcl2.Body, context *hcl2.EvalContext) {
 	supportedTags := []string{"div", "h1", "h2", "h3", "b", "center", "p", "marquee", "span", "content", "ul", "ol", "li", "br"}
 
