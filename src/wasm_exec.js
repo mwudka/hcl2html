@@ -587,6 +587,15 @@
 })();
 
 (async function() {
+	// Polyfill for Glenn, who uses Safari
+	if (!WebAssembly.instantiateStreaming) { 
+		WebAssembly.instantiateStreaming = async (resp, importObject) => {
+			const source = await (await resp).arrayBuffer();
+			return await WebAssembly.instantiate(source, importObject);
+		};
+	}
+
+
 	while(true) {
 		const go = new Go();
 		let result = await WebAssembly.instantiateStreaming(fetch("public/hcl_wasm.wasm"), go.importObject);
